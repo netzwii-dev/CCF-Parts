@@ -1,45 +1,65 @@
 local Workspace = game:GetService("Workspace")
 
--- Função para checar se a cor é verde aproximada
-local function isGreen(part)
-    local color = part.Color
-    return color.G > color.R and color.G > color.B -- Verde dominante
+-- Detecta se é parte de player/NPC
+local function isCharacter(part)
+	local model = part:FindFirstAncestorOfClass("Model")
+	if model and model:FindFirstChildOfClass("Humanoid") then
+		return true
+	end
+	return false
 end
 
--- Função para checar se é um tronco marrom
-local function isBrownTrunk(part)
-    local color = part.Color
-    return color.R > 0.3 and color.G > 0.15 and color.B < 0.1 -- aproximação marrom
-        and part.Size.Y > 2 -- vertical alto
+-- Verde (folhas)
+local function isLeaf(part)
+	local color = part.Color
+	return color.G > 0.4 and color.G > color.R and color.G > color.B
 end
 
--- Loop por todas as partes do mapa
+-- Tronco marrom
+local function isTrunk(part)
+	local color = part.Color
+	return color.R > 0.3 and color.G > 0.15 and color.B < 0.15
+		and part.Size.Y > part.Size.X -- mais alto que largo
+end
+
+-- Guarda troncos primeiro (otimização)
+local trunks = {}
+
 for _, part in pairs(Workspace:GetDescendants()) do
-    if part:IsA("BasePart") then
-        -- Sem colisão
-        if not part.CanCollide then
-            -- Verde direto
-            if isGreen(part) then
-                part:Destroy()
-            else
-                -- Quadrado sobre tronco
-                local aboveTrunk = false
-                for _, checkPart in pairs(Workspace:GetDescendants()) do
-                    if checkPart:IsA("BasePart") and isBrownTrunk(checkPart) then
-                        -- checa se part está em cima do tronco (aproximação)
-                        local dx = math.abs(part.Position.X - checkPart.Position.X)
-                        local dz = math.abs(part.Position.Z - checkPart.Position.Z)
-                        local dy = part.Position.Y - (checkPart.Position.Y + checkPart.Size.Y/2)
-                        if dx < checkPart.Size.X/2 and dz < checkPart.Size.Z/2 and dy > 0 and dy < 10 then
-                            aboveTrunk = true
-                            break
-                        end
-                    end
-                end
-                if aboveTrunk then
-                    part:Destroy()
-                end
-            end
-        end
-    end
+	if part:IsA("BasePart") and isTrunk(part) then
+		table.insert(trunks, part)
+	end
+end
+
+-- Agora remove folhas
+for _, part in pairs(Workspace:GetDescendants()) do
+	if part:IsA("BasePart") then
+		
+		-- NÃO mexe em player
+		if isCharacter(part) then
+			continue
+		end
+		
+		-- só partes do mapa
+		if part.Anchored and not part.CanCollide then
+			
+			-- folhas verdes
+			if isLeaf(part) then
+				part:Destroy()
+				continue
+			end
+			
+			-- folhas em cima de tronco
+			for _, trunk in pairs(trunks) do
+				local dx = math.abs(part.Position.X - trunk.Position.X)
+				local dz = math.abs(part.Position.Z - trunk.Position.Z)
+				local dy = part.Position.Y - (trunk.Position.Y + trunk.Size.Y/2)
+
+				if dx < trunk.Size.X/2 and dz < trunk.Size.Z/2 and dy > 0 and dy < 15 then
+					part:Destroy()
+					break
+				end
+			end
+		end
+	end
 end
