@@ -1,68 +1,53 @@
 local Workspace = game:GetService("Workspace")
 
--- Ignora qualquer coisa de player/NPC
+-- Função para ignorar players
 local function isCharacter(part)
 	local model = part:FindFirstAncestorOfClass("Model")
 	return model and model:FindFirstChildOfClass("Humanoid")
 end
 
--- Detecta tronco
-local function isTrunk(part)
-	local c = part.Color
-	return part:IsA("BasePart")
-		and part.Anchored
-		and part.CanCollide
-		and part.Size.Y > part.Size.X -- formato vertical
-		and c.R > 0.3 and c.G > 0.15 and c.B < 0.15
+-- Função para checar se a cor é verde aproximada
+local function isGreen(part)
+	local color = part.Color
+	return color.G > color.R and color.G > color.B
 end
 
--- Cache
-local parts = Workspace:GetDescendants()
-local trunks = {}
-
--- Coleta troncos
-for _, part in ipairs(parts) do
-	if isTrunk(part) then
-		table.insert(trunks, part)
-	end
+-- Função para checar se é um tronco marrom
+local function isBrownTrunk(part)
+	local color = part.Color
+	return color.R > 0.3 and color.G > 0.15 and color.B < 0.1
+		and part.Size.Y > 2
 end
 
--- Remove folhas
-for _, part in ipairs(parts) do
-	if part:IsA("BasePart") then
+-- Loop por todas as partes do mapa
+for _, part in pairs(Workspace:GetDescendants()) do
+	if part:IsA("BasePart") and not isCharacter(part) then
 		
-		-- Nunca mexe em personagem
-		if isCharacter(part) then
-			continue
-		end
-		
-		-- Só mapa
-		if part.Anchored then
+		if not part.CanCollide then
 			
-			-- folhas são blocos "mais largos que altos"
-			if part.Size.X >= part.Size.Y and part.Size.Z >= part.Size.Y then
+			if isGreen(part) then
+				part:Destroy()
+			else
+				local aboveTrunk = false
 				
-				-- checa se está em cima de um tronco
-				for _, trunk in ipairs(trunks) do
-					if trunk and trunk.Parent then
+				for _, checkPart in pairs(Workspace:GetDescendants()) do
+					if checkPart:IsA("BasePart") and isBrownTrunk(checkPart) then
 						
-						local dx = math.abs(part.Position.X - trunk.Position.X)
-						local dz = math.abs(part.Position.Z - trunk.Position.Z)
-						local dy = part.Position.Y - (trunk.Position.Y + trunk.Size.Y/2)
+						local dx = math.abs(part.Position.X - checkPart.Position.X)
+						local dz = math.abs(part.Position.Z - checkPart.Position.Z)
+						local dy = part.Position.Y - (checkPart.Position.Y + checkPart.Size.Y/2)
 
-						if dx < trunk.Size.X
-						and dz < trunk.Size.Z
-						and dy > 0
-						and dy < 20 then
-							
-							part:Destroy()
+						if dx < checkPart.Size.X/2 and dz < checkPart.Size.Z/2 and dy > 0 and dy < 10 then
+							aboveTrunk = true
 							break
 						end
 					end
 				end
 				
+				if aboveTrunk then
+					part:Destroy()
+				end
 			end
-			
 		end
 	end
 end
